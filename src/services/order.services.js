@@ -1,8 +1,32 @@
 import { AppError } from "../helpers/error.helpers.js";
 import { shippingMethodOptions } from "../models/checkout.model.js";
 import { Order, OrderStatus, PaymentStatus } from "../models/order.model.js";
-import { Product } from "../models/product.model.js";
+import { Product, SizeTypes } from "../models/product.model.js";
 import { User } from "../models/user.model.js";
+
+const getSelectedInventory = (product, item) => {
+    const requiresSize = product.category === "Camisetas" || product.category === "Buzos";
+
+    if (requiresSize) {
+        if (!item.size || !SizeTypes.includes(item.size)) {
+            throw new AppError("Debe seleccionar una talla valida", 400);
+        }
+
+        const inventoryIndex = product.inventory.findIndex((element) => element.size === item.size);
+
+        if (inventoryIndex === -1) {
+            throw new AppError("La talla seleccionada no esta disponible para este producto", 400);
+        }
+
+        return { selectedInventory: product.inventory[inventoryIndex], inventoryIndex };
+    }
+
+    if (item.size) {
+        throw new AppError("Este producto no requiere talla", 400);
+    }
+
+    return { selectedInventory: product.inventory?.[0], inventoryIndex: 0 };
+};
 
 const buildItemsWithTotal = async(items) => {
     if (!Array.isArray(items) || items.length === 0) {
@@ -27,7 +51,9 @@ const buildItemsWithTotal = async(items) => {
             throw new AppError("Uno de los productos no existe", 404);
         }
 
-        if (product.stock < item.quantity) {
+        const { selectedInventory } = getSelectedInventory(product, item);
+
+        if (!selectedInventory || selectedInventory.stock < item.quantity) {
             throw new AppError("Stock insuficiente para uno de los productos", 400);
         }
 
@@ -43,6 +69,60 @@ const buildItemsWithTotal = async(items) => {
     }
 
     return { normalizedItems, total };
+};
+
+const discountProductInventory = async(items) => {
+    const appliedDiscounts = [];
+
+    for (const item of items) {
+        try {
+            const product = await Product.findById(item.product).lean().exec();
+
+            if (!product) {
+                throw new AppError("Uno de los productos no existe", 404);
+            }
+
+            const { inventoryIndex } = getSelectedInventory(product, item);
+            const stockPath = `inventory.${inventoryIndex}.stock`;
+
+            const updatedProduct = await Product.findOneAndUpdate(
+                {
+                    _id: item.product,
+                    [stockPath]: { $gte: item.quantity }
+                },
+                {
+                    $inc: { [stockPath]: -item.quantity }
+                },
+                { returnDocument: "after" }
+            )
+                .lean()
+                .exec();
+
+            if (!updatedProduct) {
+                throw new AppError("Stock insuficiente para uno de los productos", 400);
+            }
+
+            appliedDiscounts.push({
+                product: item.product,
+                stockPath,
+                quantity: item.quantity
+            });
+        } catch (error) {
+            await restoreProductInventory(appliedDiscounts);
+            throw error;
+        }
+    }
+
+    return appliedDiscounts;
+};
+
+const restoreProductInventory = async(discounts) => {
+    for (const discount of discounts.reverse()) {
+        await Product.findByIdAndUpdate(
+            discount.product,
+            { $inc: { [discount.stockPath]: discount.quantity } }
+        ).exec();
+    }
 };
 
 const getTransportationCost = (shippingMethod) => {
@@ -84,8 +164,15 @@ export const getOrdersByUserService = async(userId) => {
 };
 
 export const createOrderService = async(body) => {
-    const order = await Order.create(body);
-    return order.toObject();
+    const appliedDiscounts = await discountProductInventory(body.items);
+
+    try {
+        const order = await Order.create(body);
+        return order.toObject();
+    } catch (error) {
+        await restoreProductInventory(appliedDiscounts);
+        throw error;
+    }
 };
 
 export const updateOrderService = async(id, body) => {
@@ -101,9 +188,9 @@ export const deleteOrderService = async(id) => {
 };
 
 export const validateCreateOrderInput = async(body) => {
-    const { user, items, shippingAddress, city, shippingMethod, paymentMethod, status, paymentStatus } = body;
+    const { user, items, shippingAddress, city, phoneNumber, shippingMethod, paymentMethod, status, paymentStatus } = body;
 
-    if (!user || !items || !shippingAddress || !city || !shippingMethod || !paymentMethod) {
+    if (!user || !items || !shippingAddress || !city || !phoneNumber || !shippingMethod || !paymentMethod) {
         throw new AppError("Los campos requeridos son obligatorios", 400);
     }
 
@@ -123,6 +210,10 @@ export const validateCreateOrderInput = async(body) => {
 
     if (city.trim().length < 2) {
         throw new AppError("La ciudad debe tener minimo 2 caracteres", 400);
+    }
+
+    if (phoneNumber.trim().length !== 10) {
+        throw new AppError("El numero telefonico debe tener una longitud valida", 400);
     }
 
     const normalizedShippingMethod = shippingMethod.trim();
@@ -147,10 +238,11 @@ export const validateCreateOrderInput = async(body) => {
         items: normalizedItems,
         shippingAddress: shippingAddress.trim(),
         city: city.trim(),
+        phoneNumber: phoneNumber.trim(),
         shippingMethod: normalizedShippingMethod,
         paymentMethod: paymentMethod.trim(),
-        status: status || "pending",
-        paymentStatus: paymentStatus || "pending",
+        status: status || "Pendiente",
+        paymentStatus: paymentStatus || "Pendiente",
         total
     };
 };
@@ -178,6 +270,14 @@ export const validateUpdateOrderInput = async(body) => {
         }
 
         updatedData.city = body.city.trim();
+    }
+
+    if (body.phoneNumber !== undefined) {
+        if (!body.phoneNumber.trim() || body.phoneNumber.trim().length !== 10) {
+            throw new AppError("El numero telefonico debe tener una longitud valida", 400);
+        }
+
+        updatedData.phoneNumber = body.phoneNumber.trim();
     }
 
     if (body.shippingMethod !== undefined) {

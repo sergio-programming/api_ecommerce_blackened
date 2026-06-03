@@ -34,6 +34,7 @@ export const validateCreateCheckoutInput = async(body) => {
     const cart = body.cart;
     const shippingAddress = normalizeText(body.shippingAddress);
     const city = normalizeText(body.city);
+    const phoneNumber = normalizeText(body.phoneNumber);
     const shippingMethod = normalizeText(body.shippingMethod);
     const paymentMethod = normalizeText(body.paymentMethod);
 
@@ -42,6 +43,7 @@ export const validateCreateCheckoutInput = async(body) => {
         isMissing(cart) ||
         isMissing(shippingAddress) ||
         isMissing(city) ||
+        isMissing(phoneNumber) ||
         isMissing(shippingMethod) ||
         isMissing(paymentMethod)
     ) {
@@ -68,6 +70,10 @@ export const validateCreateCheckoutInput = async(body) => {
         throw new AppError('La ciudad debe tener una longitud minima de 2 caracteres', 400);
     }
 
+    if (phoneNumber.length !== 10) {
+        throw new AppError('El número telefónico debe tener una longitud válida', 400);
+    }
+
     if (!shippingMethodOptions.includes(shippingMethod)) {
         throw new AppError('Debe seleccionar un metodo de envío válido', 400);
     }
@@ -86,6 +92,7 @@ export const validateCreateCheckoutInput = async(body) => {
         cart,
         shippingAddress,
         city,
+        phoneNumber,
         shippingMethod,
         paymentMethod,
         total
@@ -97,6 +104,7 @@ export const validateUpdateCheckoutInput = async(cartId, body) => {
     const allowedKeys = [
         'shippingAddress',
         'city',
+        'phoneNumber',
         'shippingMethod',
         'paymentMethod'
     ]
@@ -119,6 +127,10 @@ export const validateUpdateCheckoutInput = async(cartId, body) => {
 
     if (updatedData.city !== undefined && updatedData.city.length < 2) {
         throw new AppError('La ciudad debe tener una longitud minima de 2 caracteres', 400);
+    }
+
+    if (updatedData.phoneNumber && updatedData.phoneNumber.length !== 10) {
+        throw new AppError('El número telefónico debe tener una longitud válida', 400);
     }
 
     if (updatedData.shippingMethod && !shippingMethodOptions.includes(updatedData.shippingMethod)) {

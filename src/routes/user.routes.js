@@ -9,7 +9,8 @@ import {
     activateUser,
     cancelUser,
     getUserProfile,
-    editUserInfo
+    editUserInfo,
+    updateUserDocumentNumber
 } from "../controllers/user.controller.js";
 import { isAdmin, verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 
@@ -19,6 +20,7 @@ userRoutes.get('/', verifyToken, isAdmin, getUsers);
 userRoutes.get('/role/:role', verifyToken, isAdmin, getUsersByRole);
 userRoutes.get('/me', verifyToken, verifyRole(['admin', 'staff', 'user']), getUserProfile)
 userRoutes.put('/me', verifyToken, verifyRole(['user']), editUserInfo);
+userRoutes.patch('/me/document-number', verifyToken, verifyRole(['user']), updateUserDocumentNumber);
 userRoutes.get('/:id', verifyToken, isAdmin, getUser);
 userRoutes.post('/', verifyToken, isAdmin, createUser);
 userRoutes.put('/:id', verifyToken, isAdmin, updateUser);

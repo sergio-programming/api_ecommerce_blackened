@@ -7,12 +7,13 @@ import {
     updateOrder,
     deleteOrder
 } from "../controllers/order.controller.js";
+import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 
 export const orderRoutes = Router();
 
-orderRoutes.get("/", getOrders);
-orderRoutes.get("/user/:userId", getOrdersByUser);
-orderRoutes.get("/:id", getOrder);
-orderRoutes.post("/", createOrder);
-orderRoutes.put("/:id", updateOrder);
-orderRoutes.delete("/:id", deleteOrder);
+orderRoutes.get("/", verifyToken, verifyRole(["admin", "staff"]), getOrders);
+orderRoutes.get("/user", verifyToken, verifyRole(["user"]), getOrdersByUser);
+orderRoutes.get("/:id", verifyToken, verifyRole(["admin", "staff"]), getOrder);
+orderRoutes.post("/", verifyToken, verifyRole(["user"]), createOrder);
+orderRoutes.put("/:id", verifyToken, verifyRole(["admin", "staff"]), updateOrder);
+orderRoutes.delete("/:id", verifyToken, verifyRole(["admin", "staff"]), deleteOrder);

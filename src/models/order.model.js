@@ -20,10 +20,11 @@ const orderSchema = new mongoose.Schema(
         items: { type: [orderItemSchema], required: true },
         shippingAddress: { type: String, required: true, trim: true, minlength: 10 },
         city: { type: String, required: true, trim: true, minlength: 2 },
+        phoneNumber: { type: String, required: true, trim: true, minlength: 10, maxlength: 10 },
         shippingMethod: { type: String, enum: shippingMethodOptions, required: true },
         paymentMethod: { type: String, required: true, trim: true },
-        status: { type: String, enum: OrderStatus, default: "pending" },
-        paymentStatus: { type: String, enum: PaymentStatus, default: "pending" },
+        status: { type: String, enum: OrderStatus, default: "Pendiente" },
+        paymentStatus: { type: String, enum: PaymentStatus, default: "Pendiente" },
         total: { type: Number, required: true, min: 0 }
     },
     { timestamps: true }

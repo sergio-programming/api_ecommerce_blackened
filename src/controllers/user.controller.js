@@ -11,7 +11,8 @@ import {
     validateCreateUserInput,
     validateUpdateUserInput,
     getUserByRoleService,
-    validateEditUserInfo
+    validateEditUserInfo,
+    validateUpdateUserDocumentNumber
 } from "../services/user.services.js";
 
 export const getUsers = async(req, res, next) => {
@@ -141,11 +142,34 @@ export const editUserInfo = async(req, res, next) => {
         res.status(200).json({
             message: 'El usuario se ha actualizado correctamente',
             user: userResponse
-        })
+        });
     } catch (error) {
         next(error);
     }
 };
+
+export const updateUserDocumentNumber = async(req, res, next) => {
+    try {
+        const validatedData = await validateUpdateUserDocumentNumber(req.body);
+
+        const updatedUser = await updateUserService(req.user.id, validatedData);
+
+        if (!updatedUser) {
+            return next(new AppError(
+                'No se pudo actualizar: usuario no encontrado',
+                404
+            ));
+        }
+
+        const { password:_, ...userResponse } = updatedUser;
+        res.status(200).json({
+            message: 'El usuario se ha actualizado correctamente',
+            user: userResponse
+        });
+    } catch (error) {
+        next(error);
+    }
+}
 
 export const deleteUser = async(req, res, next) => {
     try {

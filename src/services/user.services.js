@@ -57,9 +57,9 @@ export const activateUserService = async(id) => {
 };
 
 export const validateCreateUserInput = async(body) => {
-    const { fullName, email, password, role } = body;
+    const { fullName, email, password, role, documentNumber } = body;
 
-    if (!fullName || !email || !password || !role) {
+    if (!fullName || !email || !password || !role || !documentNumber) {
         throw new AppError('Los campos requeridos son obligatorios', 400);
     }
 
@@ -79,6 +79,10 @@ export const validateCreateUserInput = async(body) => {
         throw new AppError('Debe asignar un rol válido', 400)
     }
 
+    if (documentNumber.trim().length < 6 || documentNumber.trim().length > 10) {
+        throw new AppError('El numero de documento debe tener una longitud valida', 400);
+    }
+
     const userExists = await User.findOne({ email });
 
     if (userExists) {
@@ -88,13 +92,14 @@ export const validateCreateUserInput = async(body) => {
         fullName: fullName.trim(),
         email: email.trim(),
         password,
-        role
+        role,
+        documentNumber: documentNumber.trim()
     }
 };
 
 export const validateUpdateUserInput = async(body) => {
     const updatedData = {};
-    const allowedKeys = ['fullName', 'email', 'role', 'isActive'];
+    const allowedKeys = ['fullName', 'email', 'role', 'isActive', 'documentNumber', 'phoneNumber'];
 
     Object.keys(body).forEach(key => {
         if (allowedKeys.includes(key)) {
@@ -128,7 +133,25 @@ export const validateUpdateUserInput = async(body) => {
         throw new AppError('El valor debe ser booleano', 400);
     }
 
+    if (updatedData.documentNumber && (updatedData.documentNumber.length < 6 || updatedData.documentNumber.length >  10 )) {
+        throw new AppError('El número de documento debe tener una longitud válida', 400);
+    }
+
     return updatedData;
+};
+
+export const validateUpdateUserDocumentNumber = async(body) => {
+    const documentNumber = body.documentNumber?.trim();
+
+    if (!documentNumber) {
+        throw new AppError('El numero de documento es obligatorio', 400);
+    }
+
+    if (documentNumber.length < 6 || documentNumber.length > 10) {
+        throw new AppError('El numero de documento debe tener una longitud valida', 400);
+    }
+
+    return { documentNumber };
 };
 
 export const validateEditUserInfo = async(body) => {

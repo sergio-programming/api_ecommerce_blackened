@@ -36,8 +36,7 @@ export const getOrder = async(req, res, next) => {
 
 export const getOrdersByUser = async(req, res, next) => {
     try {
-        const { userId } = req.params;
-        const orders = await getOrdersByUserService(userId);
+        const orders = await getOrdersByUserService(req.user.id);
 
         res.status(200).json(orders);
     } catch (error) {
@@ -47,7 +46,10 @@ export const getOrdersByUser = async(req, res, next) => {
 
 export const createOrder = async(req, res, next) => {
     try {
-        const createdData = await validateCreateOrderInput(req.body);
+        const createdData = await validateCreateOrderInput({
+            ...req.body,
+            user: req.user.id
+        });
         const newOrder = await createOrderService(createdData);
 
         res.status(201).json({
