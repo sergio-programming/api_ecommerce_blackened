@@ -10,6 +10,7 @@ class User {
   +String password
   +UserRole role
   +Boolean isActive
+  +String documentNumber
   +Date createdAt
   +Date updatedAt
 }
@@ -53,6 +54,7 @@ class Checkout {
   +ObjectId user
   +String shippingAddress
   +String city
+  +String phoneNumber
   +ShippingMethod shippingMethod
   +PaymentMethod paymentMethod
   +Number total
@@ -66,8 +68,9 @@ class Order {
   +OrderItem[] items
   +String shippingAddress
   +String city
+  +String phoneNumber
   +ShippingMethod shippingMethod
-  +String paymentMethod
+  +PaymentMethod paymentMethod
   +OrderStatus status
   +PaymentStatus paymentStatus
   +Number total
@@ -144,7 +147,45 @@ OrderItem --> SizeType
 Checkout --> ShippingMethod
 Checkout --> PaymentMethod
 Order --> ShippingMethod
+Order --> PaymentMethod
 Order --> OrderStatus
 Order --> PaymentStatus
+
+note right of User
+  email: unique, lowercase, email format
+  password: min length 8
+  documentNumber: optional, length 6..10
+end note
+
+note right of Product
+  productCode: unique, format AAA-0000
+  description: length 10..100
+  price: min 0
+end note
+
+note right of InventoryItem
+  size is required for Camisetas/Buzos
+  size is omitted for CD
+  stock: min 0
+end note
+
+note right of Cart
+  user is unique: one active cart per user
+  total is calculated from items
+end note
+
+note right of Checkout
+  shippingAddress: min length 10
+  city: min length 2
+  phoneNumber: exactly 10 digits
+  total is calculated from cart items
+end note
+
+note right of Order
+  phoneNumber: exactly 10 digits
+  total includes items plus shipping cost
+  default status: Pendiente
+  default paymentStatus: Pendiente
+end note
 @enduml
 ```
