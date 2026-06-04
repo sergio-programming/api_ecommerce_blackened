@@ -15,7 +15,8 @@ const app = express();
 
 dotenv.config();
 
-const allowedOrigins = [
+const configuredOrigins = process.env.CORS_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean);
+const allowedOrigins = configuredOrigins?.length ? configuredOrigins : [
     'http://localhost:4200',
     'http://127.0.0.1:4200'
 ];
@@ -34,7 +35,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
@@ -58,4 +59,3 @@ connectToDatabase()
         console.error('No se pudo conectar con MongoDB: ' , error);
         process.exit(1)
     });
-

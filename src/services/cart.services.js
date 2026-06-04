@@ -1,4 +1,5 @@
 import { AppError } from "../helpers/error.helpers.js";
+import { ensureValidObjectId } from "../helpers/validation.helpers.js";
 import { Cart } from "../models/cart.model.js";
 import { Product, SizeTypes } from "../models/product.model.js";
 import { User } from "../models/user.model.js";
@@ -10,13 +11,18 @@ const buildItemsWithTotal = async(items) => {
 
     const normalizedItems = [];
     let total = 0;
+    const requestedByProductAndSize = new Map();
 
     for (const item of items) {
         if (!item.product || !item.quantity) {
             throw new AppError("Cada item debe incluir producto y cantidad", 400);
         }
 
-        if (item.quantity < 1) {
+        ensureValidObjectId(item.product, "producto");
+
+        const quantity = Number(item.quantity);
+
+        if (!Number.isInteger(quantity) || quantity < 1) {
             throw new AppError("La cantidad debe ser mayor o igual a 1", 400);
         }
 
@@ -51,11 +57,16 @@ const buildItemsWithTotal = async(items) => {
             throw new AppError("Este producto no requiere talla", 400);
         }
 
-        if (!selectedInventory || selectedInventory.stock < item.quantity) {
+        const stockKey = `${product._id.toString()}:${normalizedItem.size || "default"}`;
+        const requestedQuantity = (requestedByProductAndSize.get(stockKey) || 0) + quantity;
+        requestedByProductAndSize.set(stockKey, requestedQuantity);
+
+        if (!selectedInventory || selectedInventory.stock < requestedQuantity) {
             throw new AppError("Stock insuficiente para uno de los productos", 400);
         }
 
-        total += priceAtMoment * item.quantity;
+        normalizedItem.quantity = quantity;
+        total += priceAtMoment * quantity;
 
         normalizedItems.push(normalizedItem);
     }
@@ -81,6 +92,8 @@ export const getCartsService = async() => {
 };
 
 export const getCartService = async(id) => {
+    ensureValidObjectId(id);
+
     return Cart.findById(id)
         .populate("user", "fullName email role")
         .populate("items.product", "productCode description price image")
@@ -89,6 +102,8 @@ export const getCartService = async(id) => {
 };
 
 export const getCartByUserService = async(userId) => {
+    ensureValidObjectId(userId, "usuario");
+
     return Cart.findOne({ user: userId })
         .populate("user", "fullName email role")
         .populate("items.product", "productCode description price image")
@@ -102,7 +117,9 @@ export const createCartService = async(body) => {
 };
 
 export const updateCartService = async(id, body) => {
-    return Cart.findByIdAndUpdate(id, { $set: body }, { returnDocument: true })
+    ensureValidObjectId(id);
+
+    return Cart.findByIdAndUpdate(id, { $set: body }, { returnDocument: 'after', runValidators: true })
         .populate("user", "fullName email role")
         .populate("items.product", "productCode description price image")
         .lean()
@@ -110,7 +127,20 @@ export const updateCartService = async(id, body) => {
 };
 
 export const deleteCartService = async(id) => {
+    ensureValidObjectId(id);
+
     return Cart.findByIdAndDelete(id).lean().exec();
+};
+
+export const assertCartBelongsToUser = async(cartId, userId) => {
+    ensureValidObjectId(cartId);
+    ensureValidObjectId(userId, "usuario");
+
+    const cart = await Cart.findOne({ _id: cartId, user: userId }).select("_id").lean().exec();
+
+    if (!cart) {
+        throw new AppError("Carrito no encontrado para este usuario", 404);
+    }
 };
 
 export const validateCreateCartInput = async(body) => {
@@ -158,6 +188,9 @@ export const validateUpdateCartInput = async(body) => {
 };
 
 export const updateCartItemService = async(cartId, itemId, quantity) => {
+    ensureValidObjectId(cartId);
+    ensureValidObjectId(itemId, "item");
+
     const cart = await Cart.findById(cartId);
 
     if (!cart) {
@@ -210,6 +243,9 @@ export const updateCartItemService = async(cartId, itemId, quantity) => {
 }
 
 export const deleteCartItemService = async(cartId, itemId) => {
+    ensureValidObjectId(cartId);
+    ensureValidObjectId(itemId, "item");
+
     const cart = await Cart.findById(cartId);
 
     if (!cart) {

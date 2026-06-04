@@ -1,4 +1,5 @@
 import { AppError } from "../helpers/error.helpers.js";
+import { ensureValidObjectId } from "../helpers/validation.helpers.js";
 import { Product, ProductCategories, SizeTypes } from "../models/product.model.js";
 
 const isValidCode = (code) => /^[A-Z]{3}-\d{4}$/.test(code);
@@ -22,7 +23,7 @@ const validateInventoryByCategory = (category, inventory) => {
     const seenSizes = new Set();
 
     normalizedInventory.forEach((item) => {
-        if (isMissing(item.stock) || typeof item.stock !== "number" || item.stock < 0) {
+        if (isMissing(item.stock) || !Number.isInteger(item.stock) || item.stock < 0) {
             throw new AppError("Dato invalido para el stock", 400);
         }
 
@@ -51,6 +52,8 @@ export const getProductsService = async() => {
 };
 
 export const getProductService = async(id) => {
+    ensureValidObjectId(id);
+
     return Product.findById(id).lean().exec();
 };
 
@@ -59,6 +62,10 @@ export const getProductByCodeService = async(productCode) => {
 }
 
 export const getProductByCategoryService = async(category) => {
+    if (!ProductCategories.includes(category)) {
+        throw new AppError("Debe seleccionar una categoria valida", 400);
+    }
+
     return Product.find({ category }).sort({ createdAt: -1 }).lean().exec();
 };
 
@@ -68,16 +75,20 @@ export const createProductService = async(body) => {
 };
 
 export const updateProductService = async(id, body) => {
+    ensureValidObjectId(id);
+
     return Product.findByIdAndUpdate(
         id,
         { $set: body },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', runValidators: true }
     )
     .lean()
     .exec();
 };
 
 export const deleteProductService = async(id) => {
+    ensureValidObjectId(id);
+
     return Product.findByIdAndDelete(id).lean().exec();
 };
 
@@ -111,7 +122,7 @@ export const validateCreateProductInput = async(body) => {
         throw new AppError("Debe seleccionar una categoria valida", 400);
     }
 
-    if (typeof price !== "number" || price < 0) {
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
         throw new AppError("Dato invalido para el precio", 400);
     }
 
@@ -176,7 +187,7 @@ export const validateUpdateProductInput = async(id, body) => {
         throw new AppError("Debe seleccionar una categoria valida", 400);
     }
 
-    if (!isMissing(updatedData.price) && (typeof updatedData.price !== "number" || updatedData.price < 0)) {
+    if (!isMissing(updatedData.price) && (typeof updatedData.price !== "number" || !Number.isFinite(updatedData.price) || updatedData.price < 0)) {
         throw new AppError("El precio no puede ser negativo", 400);
     }
 

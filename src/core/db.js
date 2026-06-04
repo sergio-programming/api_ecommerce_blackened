@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import { requireEnv } from "../helpers/validation.helpers.js";
 
 export const connectToDatabase = async() => {
-    const mongoUrl = process.env.MONGO_URI;
+    const mongoUrl = requireEnv("MONGO_URI");
 
     // Listeners para tener el status de la conexión
     mongoose.connection.on('connected', () => console.log('Conectado a MongoDB'));
@@ -13,7 +14,7 @@ export const connectToDatabase = async() => {
     }
 
     return mongoose.connect(mongoUrl, {
-        autoIndex: true,
+        autoIndex: process.env.NODE_ENV !== "production",
         maxPoolSize: 10,
     })
 

@@ -5,7 +5,8 @@ import {
     updateCheckoutService,
     deleteCheckoutService,
     validateCreateCheckoutInput,
-    validateUpdateCheckoutInput 
+    validateUpdateCheckoutInput,
+    assertCheckoutBelongsToUser
 } from "../services/checkout.services.js";
 
 export const getCheckoutByUser = async(req, res, next) => {
@@ -47,7 +48,8 @@ export const updateCheckout = async(req, res, next) => {
     try {
         const { id, cartId } = req.params;
 
-        const validatedData = await validateUpdateCheckoutInput(cartId, req.body);
+        await assertCheckoutBelongsToUser(id, req.user.id);
+        const validatedData = await validateUpdateCheckoutInput(cartId, req.user.id, req.body);
 
         const updatedCheckout = await updateCheckoutService(id, validatedData);
         
@@ -71,6 +73,7 @@ export const deleteCheckout = async(req, res, next) => {
     try {
         const { id } = req.params;
 
+        await assertCheckoutBelongsToUser(id, req.user.id);
         const deletedCheckout = await deleteCheckoutService(id);
 
         if (!deletedCheckout) {

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { AppError } from '../helpers/error.helpers.js';
+import { requireEnv } from '../helpers/validation.helpers.js';
 
 export const verifyToken = async (req, res, next) => {
     try {
@@ -15,7 +16,7 @@ export const verifyToken = async (req, res, next) => {
             throw new AppError('Formato de token invalido', 401);
         }
 
-        const SECRET_KEY = process.env.JWT_SECRET_KEY;
+        const SECRET_KEY = requireEnv('JWT_SECRET_KEY');
         const decoded = jwt.verify(token, SECRET_KEY);
 
         req.user = decoded;

@@ -3,11 +3,17 @@ import { AppError } from "../helpers/error.helpers.js";
 import { getUserByEmailService } from "./user.services.js";
 import { comparePassword } from "../helpers/password.helpers.js";
 import { User } from '../models/user.model.js';
+import { requireEnv } from "../helpers/validation.helpers.js";
 
 export const authenticateUser = async(body) => {
     const payload = {};
 
     Object.keys(body).forEach(key => {
+        if (typeof body[key] !== 'string') {
+            payload[key] = body[key];
+            return;
+        }
+
         if (key === 'email') {
             payload[key] = body[key].trim().toLowerCase();
         } else {
@@ -61,7 +67,8 @@ export const validateRegisterUserInput = async(body) => {
         throw new AppError('La contraseña debe tener mínimo 8 caracteres', 400);
     }
 
-    const userExists = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const userExists = await User.findOne({ email: normalizedEmail });
 
     if (userExists) {
         throw new AppError('Ya existe un usuario con ese email', 409);
@@ -69,7 +76,7 @@ export const validateRegisterUserInput = async(body) => {
 
     return {
         fullName: fullName.trim(),
-        email: email.trim(),
+        email: normalizedEmail,
         password: password.trim(),
         role: 'user'
     }
@@ -77,7 +84,7 @@ export const validateRegisterUserInput = async(body) => {
 
 export const verifyRefreshToken = (token) => {
     try {
-        const REFRESH_SECRET_KEY = process.env.JWT_REFRESH_SECRET_KEY;
+        const REFRESH_SECRET_KEY = requireEnv('JWT_REFRESH_SECRET_KEY');
         const decoded = jwt.verify(token, REFRESH_SECRET_KEY);
         return decoded;
     } catch (error) {

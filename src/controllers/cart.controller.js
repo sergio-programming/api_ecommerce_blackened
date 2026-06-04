@@ -10,7 +10,8 @@ import {
     validateCreateCartInput,
     validateUpdateCartInput,
     deleteCartItemService,
-    updateCartItemService
+    updateCartItemService,
+    assertCartBelongsToUser
 } from "../services/cart.services.js";
 
 
@@ -54,7 +55,10 @@ export const getCartByUser = async(req, res, next) => {
 
 export const createCart = async(req, res, next) => {
     try {
-        const createdData = await validateCreateCartInput(req.body);
+        const createdData = await validateCreateCartInput({
+            ...req.body,
+            user: req.user.id
+        });
         const newCart = await createCartService(createdData);
 
         res.status(201).json({
@@ -69,6 +73,7 @@ export const createCart = async(req, res, next) => {
 export const updateCart = async(req, res, next) => {
     try {
         const { id } = req.params;
+        await assertCartBelongsToUser(id, req.user.id);
         const updatedData = await validateUpdateCartInput(req.body);
         const updatedCart = await updateCartService(id, updatedData);
 
@@ -88,6 +93,7 @@ export const updateCart = async(req, res, next) => {
 export const deleteCart = async(req, res, next) => {
     try {
         const { id } = req.params;
+        await assertCartBelongsToUser(id, req.user.id);
         const deletedCart = await deleteCartService(id);
 
         if (!deletedCart) {
@@ -108,6 +114,7 @@ export const updateCartItem = async(req, res, next) => {
         const { id, itemId } = req.params;
         const { quantity } = req.body;
 
+        await assertCartBelongsToUser(id, req.user.id);
         const updatedCart = await updateCartItemService(id, itemId, quantity);
 
         if (!updatedCart) {
@@ -126,6 +133,7 @@ export const updateCartItem = async(req, res, next) => {
 export const deleteCartItem = async(req, res, next) => {
     try {
         const { id, itemId } = req.params;
+        await assertCartBelongsToUser(id, req.user.id);
         const updatedCart = await deleteCartItemService(id, itemId);
         
         if (!updatedCart) {

@@ -1,11 +1,14 @@
 import { User, UserRoles } from "../models/user.model.js";
 import { AppError } from "../helpers/error.helpers.js";
+import { ensureValidObjectId } from "../helpers/validation.helpers.js";
 
 export const getUsersService = async() => {
     return User.find().select('-password').sort({ createdAt: -1 }).lean().exec();
 };
 
 export const getUserService = async(id) => {
+    ensureValidObjectId(id, "usuario");
+
     return User.findById(id).lean().exec();
 };
 
@@ -14,7 +17,11 @@ export const getUserByEmailService = async(email) => {
 };
 
 export const getUserByRoleService = async(role) => {
-    return (await User.find({ role }).select('-password')).sort({ createdAt: -1 }).lean().exec();
+    if (!UserRoles.includes(role)) {
+        throw new AppError("Debe asignar un rol valido", 400);
+    }
+
+    return User.find({ role }).select('-password').sort({ createdAt: -1 }).lean().exec();
 }
 
 export const createUserService = async(body) => {
@@ -23,34 +30,42 @@ export const createUserService = async(body) => {
 };
 
 export const updateUserService = async(id, body) => {
+    ensureValidObjectId(id, "usuario");
+
     return User.findByIdAndUpdate(
         id,
         { $set: body },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', runValidators: true }
     )
     .lean()
     .exec();
 };
 
 export const deleteUserService = async(id) => {
+    ensureValidObjectId(id, "usuario");
+
     return User.findByIdAndDelete(id).lean().exec();
 };
 
 export const cancelUserService = async(id) => {
+    ensureValidObjectId(id, "usuario");
+
     return User.findByIdAndUpdate(
         id,
         { $set: { isActive: false } },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', runValidators: true }
     )
     .lean()
     .exec();
 };
 
 export const activateUserService = async(id) => {
+    ensureValidObjectId(id, "usuario");
+
     return User.findByIdAndUpdate(
         id,
         { $set: { isActive: true } },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', runValidators: true }
     )
     .lean()
     .exec();
@@ -83,14 +98,15 @@ export const validateCreateUserInput = async(body) => {
         throw new AppError('El numero de documento debe tener una longitud valida', 400);
     }
 
-    const userExists = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const userExists = await User.findOne({ email: normalizedEmail });
 
     if (userExists) {
         throw new AppError('Ya existe un usuario con ese email', 409);
     }
     return {
         fullName: fullName.trim(),
-        email: email.trim(),
+        email: normalizedEmail,
         password,
         role,
         documentNumber: documentNumber.trim()
@@ -99,14 +115,14 @@ export const validateCreateUserInput = async(body) => {
 
 export const validateUpdateUserInput = async(body) => {
     const updatedData = {};
-    const allowedKeys = ['fullName', 'email', 'role', 'isActive', 'documentNumber', 'phoneNumber'];
+    const allowedKeys = ['fullName', 'email', 'role', 'isActive', 'documentNumber'];
 
     Object.keys(body).forEach(key => {
         if (allowedKeys.includes(key)) {
             if (key === 'fullName') {
                 updatedData[key] = body[key].trim();
             } else if (key === 'email') {
-                updatedData[key] = body[key].toLowerCase();
+                updatedData[key] = body[key].trim().toLowerCase();
             } else {
                 updatedData[key] = body[key];
             }

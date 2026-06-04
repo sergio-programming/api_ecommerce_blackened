@@ -1,5 +1,6 @@
 import { AppError } from "../helpers/error.helpers.js";
-import { shippingMethodOptions } from "../models/checkout.model.js";
+import { ensureValidObjectId, isTenDigitPhone } from "../helpers/validation.helpers.js";
+import { paymentMethodOptions, shippingMethodOptions } from "../models/checkout.model.js";
 import { Order, OrderStatus, PaymentStatus } from "../models/order.model.js";
 import { Product, SizeTypes } from "../models/product.model.js";
 import { User } from "../models/user.model.js";
@@ -35,13 +36,18 @@ const buildItemsWithTotal = async(items) => {
 
     const normalizedItems = [];
     let total = 0;
+    const requestedByProductAndSize = new Map();
 
     for (const item of items) {
         if (!item.product || !item.quantity) {
             throw new AppError("Cada item debe incluir producto y cantidad", 400);
         }
 
-        if (item.quantity < 1) {
+        ensureValidObjectId(item.product, "producto");
+
+        const quantity = Number(item.quantity);
+
+        if (!Number.isInteger(quantity) || quantity < 1) {
             throw new AppError("La cantidad debe ser mayor o igual a 1", 400);
         }
 
@@ -53,17 +59,21 @@ const buildItemsWithTotal = async(items) => {
 
         const { selectedInventory } = getSelectedInventory(product, item);
 
-        if (!selectedInventory || selectedInventory.stock < item.quantity) {
+        const stockKey = `${product._id.toString()}:${item.size || "default"}`;
+        const requestedQuantity = (requestedByProductAndSize.get(stockKey) || 0) + quantity;
+        requestedByProductAndSize.set(stockKey, requestedQuantity);
+
+        if (!selectedInventory || selectedInventory.stock < requestedQuantity) {
             throw new AppError("Stock insuficiente para uno de los productos", 400);
         }
 
         const priceAtMoment = product.price;
-        total += priceAtMoment * item.quantity;
+        total += priceAtMoment * quantity;
 
         normalizedItems.push({
             product: product._id,
             size: item.size,
-            quantity: item.quantity,
+            quantity,
             priceAtMoment
         });
     }
@@ -147,6 +157,8 @@ export const getOrdersService = async() => {
 };
 
 export const getOrderService = async(id) => {
+    ensureValidObjectId(id);
+
     return Order.findById(id)
         .populate("user", "fullName email role")
         .populate("items.product", "productCode description price image")
@@ -176,7 +188,9 @@ export const createOrderService = async(body) => {
 };
 
 export const updateOrderService = async(id, body) => {
-    return Order.findByIdAndUpdate(id, { $set: body }, { returnDocument: 'after' })
+    ensureValidObjectId(id);
+
+    return Order.findByIdAndUpdate(id, { $set: body }, { returnDocument: 'after', runValidators: true })
         .populate("user", "fullName email role")
         .populate("items.product", "productCode description price image")
         .lean()
@@ -184,15 +198,19 @@ export const updateOrderService = async(id, body) => {
 };
 
 export const deleteOrderService = async(id) => {
+    ensureValidObjectId(id);
+
     return Order.findByIdAndDelete(id).lean().exec();
 };
 
 export const validateCreateOrderInput = async(body) => {
-    const { user, items, shippingAddress, city, phoneNumber, shippingMethod, paymentMethod, status, paymentStatus } = body;
+    const { user, items, shippingAddress, city, phoneNumber, shippingMethod, paymentMethod } = body;
 
     if (!user || !items || !shippingAddress || !city || !phoneNumber || !shippingMethod || !paymentMethod) {
         throw new AppError("Los campos requeridos son obligatorios", 400);
     }
+
+    ensureValidObjectId(user, "usuario");
 
     const existingUser = await User.findById(user).lean().exec();
 
@@ -212,8 +230,8 @@ export const validateCreateOrderInput = async(body) => {
         throw new AppError("La ciudad debe tener minimo 2 caracteres", 400);
     }
 
-    if (phoneNumber.trim().length !== 10) {
-        throw new AppError("El numero telefonico debe tener una longitud valida", 400);
+    if (!isTenDigitPhone(phoneNumber.trim())) {
+        throw new AppError("El numero telefonico debe tener 10 digitos", 400);
     }
 
     const normalizedShippingMethod = shippingMethod.trim();
@@ -222,12 +240,10 @@ export const validateCreateOrderInput = async(body) => {
         throw new AppError("Debes asignar un metodo de entrega valido", 400);
     }
 
-    if (status && !OrderStatus.includes(status)) {
-        throw new AppError("Debes asignar un estado de orden valido", 400);
-    }
+    const normalizedPaymentMethod = paymentMethod.trim();
 
-    if (paymentStatus && !PaymentStatus.includes(paymentStatus)) {
-        throw new AppError("Debes asignar un estado de pago valido", 400);
+    if (!paymentMethodOptions.includes(normalizedPaymentMethod)) {
+        throw new AppError("Debes asignar un metodo de pago valido", 400);
     }
 
     const { normalizedItems, total: itemsTotal } = await buildItemsWithTotal(items);
@@ -240,9 +256,9 @@ export const validateCreateOrderInput = async(body) => {
         city: city.trim(),
         phoneNumber: phoneNumber.trim(),
         shippingMethod: normalizedShippingMethod,
-        paymentMethod: paymentMethod.trim(),
-        status: status || "Pendiente",
-        paymentStatus: paymentStatus || "Pendiente",
+        paymentMethod: normalizedPaymentMethod,
+        status: "Pendiente",
+        paymentStatus: "Pendiente",
         total
     };
 };
@@ -251,9 +267,7 @@ export const validateUpdateOrderInput = async(body) => {
     const updatedData = {};
 
     if (body.items !== undefined) {
-        const { normalizedItems, total } = await buildItemsWithTotal(body.items);
-        updatedData.items = normalizedItems;
-        updatedData.total = total;
+        throw new AppError("No se permite actualizar items de una orden existente", 400);
     }
 
     if (body.shippingAddress !== undefined) {
@@ -273,8 +287,8 @@ export const validateUpdateOrderInput = async(body) => {
     }
 
     if (body.phoneNumber !== undefined) {
-        if (!body.phoneNumber.trim() || body.phoneNumber.trim().length !== 10) {
-            throw new AppError("El numero telefonico debe tener una longitud valida", 400);
+        if (!body.phoneNumber.trim() || !isTenDigitPhone(body.phoneNumber.trim())) {
+            throw new AppError("El numero telefonico debe tener 10 digitos", 400);
         }
 
         updatedData.phoneNumber = body.phoneNumber.trim();
@@ -295,7 +309,13 @@ export const validateUpdateOrderInput = async(body) => {
             throw new AppError("El metodo de pago es obligatorio", 400);
         }
 
-        updatedData.paymentMethod = body.paymentMethod.trim();
+        const normalizedPaymentMethod = body.paymentMethod.trim();
+
+        if (!paymentMethodOptions.includes(normalizedPaymentMethod)) {
+            throw new AppError("Debes asignar un metodo de pago valido", 400);
+        }
+
+        updatedData.paymentMethod = normalizedPaymentMethod;
     }
 
     if (body.status !== undefined) {

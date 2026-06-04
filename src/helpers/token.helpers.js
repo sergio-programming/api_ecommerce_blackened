@@ -1,10 +1,11 @@
 import jwt from 'jsonwebtoken';
+import { requireEnv } from './validation.helpers.js';
 
 export const generateTokens = (user) => {
-    const SECRET_KEY = process.env.JWT_SECRET_KEY;
-    const EXPIRES_IN = process.env.JWT_EXPIRES_IN;
-    const REFRESH_SECRET_KEY = process.env.JWT_REFRESH_SECRET_KEY;
-    const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN;
+    const SECRET_KEY = requireEnv('JWT_SECRET_KEY');
+    const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+    const REFRESH_SECRET_KEY = requireEnv('JWT_REFRESH_SECRET_KEY');
+    const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 
     const accessToken = jwt.sign(

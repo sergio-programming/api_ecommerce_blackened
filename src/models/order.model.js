@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { shippingMethodOptions } from "./checkout.model.js";
+import { paymentMethodOptions, shippingMethodOptions } from "./checkout.model.js";
 import { SizeTypes } from "./product.model.js";
 
 export const OrderStatus = ["Pendiente", "Enviada", "Entregada", "Cancelada"];
@@ -20,9 +20,9 @@ const orderSchema = new mongoose.Schema(
         items: { type: [orderItemSchema], required: true },
         shippingAddress: { type: String, required: true, trim: true, minlength: 10 },
         city: { type: String, required: true, trim: true, minlength: 2 },
-        phoneNumber: { type: String, required: true, trim: true, minlength: 10, maxlength: 10 },
+        phoneNumber: { type: String, required: true, trim: true, match: /^\d{10}$/ },
         shippingMethod: { type: String, enum: shippingMethodOptions, required: true },
-        paymentMethod: { type: String, required: true, trim: true },
+        paymentMethod: { type: String, enum: paymentMethodOptions, required: true, trim: true },
         status: { type: String, enum: OrderStatus, default: "Pendiente" },
         paymentStatus: { type: String, enum: PaymentStatus, default: "Pendiente" },
         total: { type: Number, required: true, min: 0 }
