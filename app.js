@@ -17,6 +17,7 @@ dotenv.config();
 
 const configuredOrigins = process.env.CORS_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean);
 const allowedOrigins = configuredOrigins?.length ? configuredOrigins : [
+    'https://ui-ecommerce-blackened.vercel.app/',
     'http://localhost:4200',
     'http://127.0.0.1:4200'
 ];
